@@ -102,6 +102,45 @@ def load_historical_stats():
 
 tokenizer, model, decision_threshold = load_auditor_model()
 
+
+# ---------------------------------------------------------------------------
+# Core Helper Functions
+# ---------------------------------------------------------------------------
+
+def serialize_ticket(row) -> str:
+    """Serialize a ticket row into the same text format used during training."""
+    return (
+        f"Description: {row.get('Ticket Description', '')} | "
+        f"Subject: {row.get('Ticket Subject', '')} | "
+        f"Assigned Priority: {row.get('Ticket Priority', '')} | "
+        f"Channel: {row.get('Ticket Channel', '')} | "
+        f"Domain: {row.get('Customer Domain', '')} | "
+        f"Type: {row.get('Ticket Type', '')}"
+    )
+
+
+def predict_mismatch(text: str):
+    """Run the trained classifier on one serialized ticket text."""
+    if not model or not tokenizer:
+        return 0, 0.5, 0.5
+        
+    inputs = tokenizer(
+        text,
+        max_length=Config.MAX_LEN,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+    )
+    with torch.no_grad():
+        outputs = model(**inputs)
+        probs = torch.softmax(outputs.logits, dim=-1)
+        prob_mismatch = probs[0][1].item()
+        
+    is_mismatch = 1 if prob_mismatch >= decision_threshold else 0
+    confidence = prob_mismatch if is_mismatch == 1 else (1.0 - prob_mismatch)
+    return is_mismatch, confidence, prob_mismatch
+
+
 # App header
 st.title("🛡️ Support Integrity Auditor (SIA)")
 st.markdown(
@@ -163,24 +202,10 @@ with tab1:
                 # Use DeBERTa Classifier
                 with st.spinner("Executing DeBERTa classification checks..."):
                     for idx, row in processed_df.iterrows():
-                        text = (
-                            f"Description: {row.get('Ticket Description', '')} | "
-                            f"Subject: {row.get('Ticket Subject', '')} | "
-                            f"Assigned Priority: {row.get('Ticket Priority', '')} | "
-                            f"Channel: {row.get('Ticket Channel', '')} | "
-                            f"Domain: {row.get('Customer Domain', '')} | "
-                            f"Type: {row.get('Ticket Type', '')}"
-                        )
-                        inputs = tokenizer(text, max_length=Config.MAX_LEN, padding="max_length", truncation=True, return_tensors="pt")
-                        with torch.no_grad():
-                            outputs = model(**inputs)
-                            probs = torch.softmax(outputs.logits, dim=-1)
-                            prob_mismatch = probs[0][1].item()
-                            
-                            pred_class = 1 if prob_mismatch >= decision_threshold else 0
-                            conf = prob_mismatch if pred_class == 1 else (1.0 - prob_mismatch)
-                            predictions.append(pred_class)
-                            confidences.append(conf)
+                        text = serialize_ticket(row)
+                        is_mismatch, confidence, prob_mismatch = predict_mismatch(text)
+                        predictions.append(is_mismatch)
+                        confidences.append(confidence)
             else:
                 # Fallback: Stage 1 Fusion Rules
                 predictions = processed_df['mismatch_label'].tolist()
@@ -298,14 +323,7 @@ with tab2:
 
                 # Evaluate mismatch
                 if model:
-                    serialized_text = (
-                        f"Description: {desc} | "
-                        f"Subject: {subject} | "
-                        f"Assigned Priority: {priority} | "
-                        f"Channel: {channel} | "
-                        f"Domain: {synthetic_row['Customer Domain']} | "
-                        f"Type: {category}"
-                    )
+                    serialized_text = serialize_ticket(synthetic_row)
                     is_mismatch, confidence, raw_prob = predict_mismatch(serialized_text)
                 else:
                     # Fallback logic
