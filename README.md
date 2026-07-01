@@ -51,14 +51,16 @@ Because the dataset does not contain pre-annotated mismatch labels, SIA bootstra
 1. **Semantic Urgency ($S_{sem}$):** Evaluated via zero-shot classification using `valhalla/distilbart-mnli-12-3` on the ticket's natural language text.
 2. **Operational Latency ($S_{ops}$):** Evaluated via group-wise robust Z-scores using Median Absolute Deviation (MAD) of the resolution time grouped by `Ticket Type`.
 
-The two signals are fused mathematically using a weighted linear combination:
-$$S_{inf} = \text{round}(0.6 \cdot S_{sem} + 0.4 \cdot S_{ops})$$
+The two signals are fused mathematically using a weighted linear combination: $S_{inf} = \text{round}(0.6 \cdot S_{sem} + 0.4 \cdot S_{ops})$.
 
 A binary mismatch label ($Y_{pseudo}$) is generated when the absolute delta between the inferred severity ($S_{inf}$) and assigned priority ($P_{assigned}$) is greater than or equal to $2$:
-$$Y_{pseudo} = \begin{cases} 
-1 & \text{if } |S_{inf} - P_{assigned}| \ge 2 \\
-0 & \text{otherwise}
-\end{cases}$$
+
+$$
+Y_{pseudo} = \begin{cases} 
+1 & \text{if } |S_{inf} - P_{assigned}| \ge 2 \\ 
+0 & \text{otherwise} 
+\end{cases}
+$$
 
 ### Stage 2: Classifier Training & Optimization
 A `microsoft/deberta-v3-small` sequence classification model is fine-tuned on the serialized text inputs.
@@ -103,19 +105,19 @@ The fine-tuned model was evaluated against 10 hand-crafted adversarial tickets d
                  ADVERSARIAL EVALUATION REPORT
 ================================================================================
     ID                        Subject Priority  Expected  Predicted   Prob Status
-ADV-01     Billing receipt inquiry...      Low         0          0 0.2242 PASS ✅
-ADV-02            Feature feedback...      Low         0          0 0.2075 PASS ✅
-ADV-03             General inquiry...      Low         0          0 0.2059 PASS ✅
-ADV-04     Account profile picture...      Low         0          0 0.1987 PASS ✅
-ADV-05  Product documentation link...      Low         0          0 0.2040 PASS ✅
-ADV-06       Headquarters location... Critical         1          1 0.8915 PASS ✅
-ADV-07     Enterprise upgrade path... Critical         1          1 0.8751 PASS ✅
-ADV-08 Password reset instructions...     High         1          1 0.8727 PASS ✅
-ADV-09       Typo in documentation...     High         1          1 0.8767 PASS ✅
-ADV-10        Invoice logo request... Critical         1          1 0.8884 PASS ✅
+ADV-01     Billing receipt inquiry...      Low         0          0 0.2242 PASS 
+ADV-02            Feature feedback...      Low         0          0 0.2075 PASS 
+ADV-03             General inquiry...      Low         0          0 0.2059 PASS 
+ADV-04     Account profile picture...      Low         0          0 0.1987 PASS 
+ADV-05  Product documentation link...      Low         0          0 0.2040 PASS 
+ADV-06       Headquarters location... Critical         1          1 0.8915 PASS 
+ADV-07     Enterprise upgrade path... Critical         1          1 0.8751 PASS 
+ADV-08 Password reset instructions...     High         1          1 0.8727 PASS 
+ADV-09       Typo in documentation...     High         1          1 0.8767 PASS 
+ADV-10        Invoice logo request... Critical         1          1 0.8884 PASS 
 --------------------------------------------------------------------------------
 Final Robustness Score: 10/10 (100.0%)
-Verdict: VERIFIED (Eligible for 10% submission bonus) 🎉
+Verdict: VERIFIED (Eligible for 10% submission bonus) 
 ================================================================================
 ```
 
@@ -137,14 +139,14 @@ To load, clean, and pseudo-label the raw CRM tickets:
 ```bash
 python run_stage1.py
 ```
-*(Note: A pre-computed labeled cache is provided at `data/processed_pseudo_labeled_tickets.csv` to bypass the 38-minute NLI run).*
+(Note: A pre-computed labeled cache is provided at `data/processed_pseudo_labeled_tickets.csv` to bypass the 38-minute NLI run).
 
 ### 3. Run Training (Stage 2)
 To run fine-tuning on the subsampled partitions:
 ```bash
 python train_pipeline.py
 ```
-*(Note: A highly optimized, verified DeBERTa model checkpoint is already fully saved in `./models/sia_deberta/` and ready for use).*
+(Note: A highly optimized, verified DeBERTa model checkpoint is already fully saved in `./models/sia_deberta/` and ready for use).
 
 ### 4. Run Batch Inference CLI (Stage 3)
 To perform batch auditing on any incoming CSV dataset and generate predictions and structured dossiers:
